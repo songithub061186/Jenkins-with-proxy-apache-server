@@ -59,6 +59,29 @@ output "ec2_public_ip" {
 }
 
 
+# Fetch your Route 53 Hosted Zone ID for jersonix.online
+data "aws_route53_zone" "example" {
+  name = "jersonix.online."  # Replace with your domain name
+}
+
+# Create Route 53 record for 'jenkins.jersonix.online'
+resource "aws_route53_record" "jenkins_record" {
+  zone_id = data.aws_route53_zone.example.id  # Use the hosted zone ID for jersonix.online
+  name    = "jenkins.jersonix.online"
+  type    = "A"
+  ttl     = 300
+  records = [aws_instance.jenkins_apache_server.public_ip]
+}
+
+# Create CNAME record to forward 'try.jersonix.online' to 'jenkins.jersonix.online'
+resource "aws_route53_record" "cname_record" {
+  zone_id = data.aws_route53_zone.example.id  # Use the hosted zone ID for jersonix.online
+  name    = "try.jersonix.online"
+  type    = "CNAME"
+  ttl     = 300
+  records = ["jenkins.jersonix.online"]
+}
+
 # Create EC2 instance for Jenkins and Apache server
 resource "aws_instance" "jenkins_apache_server" {
   ami                    = "ami-0e2c8caa4b6378d8c" # Replace with the latest Ubuntu AMI for us-east-1
@@ -133,17 +156,20 @@ resource "aws_instance" "jenkins_apache_server" {
     sudo bash -c "cat > $JENKINS_CONF_PATH" <<JENKINS_CONF
 <VirtualHost *:80>
     ServerName jenkins.jersonix.online
-    ProxyRequests Off
-    ProxyPreserveHost On
-    AllowEncodedSlashes NoDecode
+ServerAlias try.jersonix.online  # Added additional server name
+ProxyRequests Off
+ProxyPreserveHost On
+AllowEncodedSlashes NoDecode
 
-    <Proxy http://localhost:8080/*>
-        Require all granted
-    </Proxy>
+<Proxy http://localhost:8080/*>
+    Require all granted
+</Proxy>
 
-    ProxyPass / http://localhost:8080/ nocanon
-    ProxyPassReverse / http://localhost:8080/
-    ProxyPassReverse / http://jenkins.jersonix.online/
+ProxyPass / http://localhost:8080/ nocanon
+ProxyPassReverse / http://localhost:8080/
+ProxyPassReverse / http://jenkins.jersonix.online/
+ProxyPassReverse / http://try.jersonix.online/
+
 </VirtualHost>
 JENKINS_CONF
 
