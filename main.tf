@@ -38,12 +38,12 @@ resource "aws_security_group" "allow_all" {
 
 # Create EC2 instance for Jenkins and Apache server
 resource "aws_instance" "jenkins_apache_server" {
-  ami           = "ami-0d5eff06f840b45e9"  # Replace with the latest Ubuntu AMI for us-east-1
+  ami           = "ami-0e2c8caa4b6378d8c"  # Replace with the latest Ubuntu AMI for us-east-1
   instance_type = "t2.micro"
-  subnet_id     = data.aws_subnet.default.id
-  security_groups = [
-    aws_security_group.allow_all.name
-  ]
+  subnet_id     = data.aws_subnet.default.id  # Ensure this subnet is correct
+  vpc_security_group_ids = [aws_security_group.allow_all.id]  # Use vpc_security_group_ids instead of security_groups
+
+  associate_public_ip_address = true  # Enable public IP address for the EC2 instance
 
   tags = {
     Name = "Jenkins Apache Server"
@@ -51,87 +51,54 @@ resource "aws_instance" "jenkins_apache_server" {
 
   # User Data script to install Jenkins, Apache, and configure firewall
   user_data = <<-EOF
+   sleep 200
+   
     #!/bin/bash
 
-    # Define your variables
-    DOMAIN="your-domain-name.com"  # Change this to your actual domain
-    JENKINS_PORT="8080"           # Default Jenkins port
+# Update package list
+sudo apt update
+sleep 60
 
-    # Update and install Java
-    sudo apt-get update
-    sudo apt-get install -y openjdk-11-jdk
+# Install OpenJDK 21 JDK
+sudo apt install openjdk-21-jdk -y
+sleep 60
 
-    # Add Jenkins repository and key
-    curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo tee \
-      /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+# Install OpenJDK 21 JRE
+sudo apt install openjdk-21-jre -y
+sleep 60
 
-    echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
-      https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
-      /etc/apt/sources.list.d/jenkins.list > /dev/null
+# Add Jenkins repository and key
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+sleep 60
 
-    # Install Jenkins
-    sudo apt-get update
-    sudo apt-get install -y jenkins
-    sudo systemctl start jenkins.service
-    sudo systemctl status jenkins
+# Configure Jenkins repository
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sleep 60
 
-    # Configure firewall
-    sudo ufw allow 8080
-    sudo ufw enable
-    sudo ufw status
+# Update package list again
+sudo apt-get update
+sleep 60
 
-    # Get Jenkins initial password
-    sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# Install Jenkins
+sudo apt-get install jenkins -y
 
-    # Install Apache and enable necessary modules
-    sudo apt-get install -y apache2
-    sudo a2enmod proxy
-    sudo a2enmod proxy_http
-    sudo a2enmod headers
+# Start Jenkins service
+sudo systemctl start jenkins.service
 
-    # Navigate to the Apache site configuration directory
-    cd /etc/apache2/sites-available/
+# Check Jenkins service status
+sudo systemctl status jenkins
 
-    # Create a new Jenkins configuration file for Apache
-    echo "Creating jenkins.conf for Apache..."
-    cat << EOF > jenkins.conf
-    <VirtualHost *:80>
-        ServerName        $DOMAIN
-        ProxyRequests     Off
-        ProxyPreserveHost On
-        AllowEncodedSlashes NoDecode
+# Allow traffic on port 8080 (Jenkins)
+sudo ufw allow 8080
 
-        <Proxy http://localhost:$JENKINS_PORT/*>
-          Order deny,allow
-          Allow from all
-        </Proxy>
+# Enable UFW
+sudo ufw enable
 
-        ProxyPass         /  http://localhost:$JENKINS_PORT/ nocanon
-        ProxyPassReverse  /  http://localhost:$JENKINS_PORT/
-        ProxyPassReverse  /  http://$DOMAIN/
-    </VirtualHost>
+# Check UFW status
+sudo ufw status
 
-    # Enable the Jenkins site and restart Apache
-    echo "Enabling Jenkins site in Apache..."
-    sudo a2ensite jenkins
-
-    echo "Restarting Apache service..."
-    sudo systemctl restart apache2
-
-    # Restart Jenkins service
-    echo "Restarting Jenkins service..."
-    sudo systemctl restart jenkins
-
-    # Configure UFW (Uncomplicated Firewall)
-    echo "Configuring UFW rules..."
-    sudo ufw allow ssh
-    sudo ufw allow http
-    sudo ufw allow https
-
-    # Enable UFW
-    echo "Enabling UFW..."
-    sudo ufw enable
-
-    echo "Setup completed successfully!"
   EOF
 }
