@@ -1,6 +1,6 @@
 provider "aws" {
-  region                     = "us-east-1"
-  shared_credentials_files    = ["/Users/JERSON POGI/.aws/credentials"]
+  region                   = "us-east-1"
+  shared_credentials_files = ["/Users/JERSON POGI/.aws/credentials"]
 }
 
 # Fetch default VPC
@@ -36,14 +36,37 @@ resource "aws_security_group" "allow_all" {
   }
 }
 
+
+resource "aws_key_pair" "keypair" {
+  key_name   = "my-keypair"  # Choose a name for the keypair
+  public_key = file("C:/Users/JERSON POGI/.ssh/my-keypair.pub")  # Path to your public key
+
+}
+
+
+output "key_pair_name" {
+  value = aws_key_pair.keypair.key_name
+}
+
+output "key_pair_id" {
+  value = aws_key_pair.keypair
+}
+
+# Output the public IP of the instance
+output "ec2_public_ip" {
+  value = aws_instance.jenkins_apache_server.public_ip
+  description = "The public IP address of the EC2 instance"
+}
+
+
 # Create EC2 instance for Jenkins and Apache server
 resource "aws_instance" "jenkins_apache_server" {
-  ami           = "ami-0e2c8caa4b6378d8c"  # Replace with the latest Ubuntu AMI for us-east-1
-  instance_type = "t2.micro"
-  subnet_id     = data.aws_subnet.default.id  # Ensure this subnet is correct
-  vpc_security_group_ids = [aws_security_group.allow_all.id]  # Use vpc_security_group_ids instead of security_groups
+  ami                    = "ami-0e2c8caa4b6378d8c" # Replace with the latest Ubuntu AMI for us-east-1
+  instance_type          = "t2.micro"
+  subnet_id              = data.aws_subnet.default.id        # Ensure this subnet is correct
+  vpc_security_group_ids = [aws_security_group.allow_all.id] # Use vpc_security_group_ids instead of security_groups
 
-  associate_public_ip_address = true  # Enable public IP address for the EC2 instance
+  associate_public_ip_address = true # Enable public IP address for the EC2 instance
 
   tags = {
     Name = "Jenkins Apache Server"
@@ -51,54 +74,94 @@ resource "aws_instance" "jenkins_apache_server" {
 
   # User Data script to install Jenkins, Apache, and configure firewall
   user_data = <<-EOF
-   sleep 200
-   
     #!/bin/bash
+    echo "start"  # Log the start of the script
 
-# Update package list
-sudo apt update
-sleep 60
+    # Redirect output and errors to a log file for debugging
+    exec > /var/log/user-data.log 2>&1
 
-# Install OpenJDK 21 JDK
-sudo apt install openjdk-21-jdk -y
-sleep 60
+    # Update package lists
+    echo "Updating package lists..."
+    sudo apt update -y
 
-# Install OpenJDK 21 JRE
-sudo apt install openjdk-21-jre -y
-sleep 60
+    # Install OpenJDK and required packages
+    echo "Installing OpenJDK 21..."
+    sudo apt install -y openjdk-21-jdk openjdk-21-jre
 
-# Add Jenkins repository and key
-sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
-  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-sleep 60
+    # Add Jenkins repository key
+    echo "Adding Jenkins repository key..."
+    wget -q -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
 
-# Configure Jenkins repository
-echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
-  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
-  /etc/apt/sources.list.d/jenkins.list > /dev/null
-sleep 60
+    # Configure Jenkins repository
+    echo "Configuring Jenkins repository..."
+    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
 
-# Update package list again
-sudo apt-get update
-sleep 60
+    # Update package lists after adding Jenkins repository
+    echo "Updating package lists after adding Jenkins repository..."
+    sudo apt update -y
 
-# Install Jenkins
-sudo apt-get install jenkins -y
+    # Install Jenkins
+    echo "Installing Jenkins..."
+    sudo apt install -y jenkins
 
-# Start Jenkins service
-sudo systemctl start jenkins.service
+    # Start and enable Jenkins service
+    echo "Starting and enabling Jenkins service..."
+    sudo systemctl start jenkins
+    sudo systemctl enable jenkins
 
-# Check Jenkins service status
-sudo systemctl status jenkins
+    # Allow traffic on port 8080 (Jenkins)
+    echo "Configuring firewall for Jenkins..."
+    sudo ufw allow 8080
 
-# Allow traffic on port 8080 (Jenkins)
-sudo ufw allow 8080
+    # Enable UFW without confirmation prompt
+    sudo ufw --force enable
 
-# Enable UFW
-sudo ufw enable
+    # Display Jenkins service status
+    echo "Displaying Jenkins service status..."
+    sudo systemctl status jenkins
 
-# Check UFW status
-sudo ufw status
+    # Install Apache2 and enable required modules
+    echo "Installing and configuring Apache2..."
+    sudo apt install apache2 -y
+    sudo a2enmod proxy
+    sudo a2enmod proxy_http
+    sudo a2enmod headers
 
+    # Create the Apache Virtual Host configuration for Jenkins
+    echo "Creating Apache VirtualHost for Jenkins..."
+    JENKINS_CONF_PATH="/etc/apache2/sites-available/jenkins.conf"
+    sudo bash -c "cat > $JENKINS_CONF_PATH" <<JENKINS_CONF
+<VirtualHost *:80>
+    ServerName jenkins.jersonix.online
+    ProxyRequests Off
+    ProxyPreserveHost On
+    AllowEncodedSlashes NoDecode
+
+    <Proxy http://localhost:8080/*>
+        Require all granted
+    </Proxy>
+
+    ProxyPass / http://localhost:8080/ nocanon
+    ProxyPassReverse / http://localhost:8080/
+    ProxyPassReverse / http://jenkins.jersonix.online/
+</VirtualHost>
+JENKINS_CONF
+
+    # Enable the new Jenkins site in Apache
+    echo "Enabling Jenkins site in Apache..."
+    sudo a2ensite jenkins
+
+    # Restart Apache to apply changes
+    echo "Restarting Apache..."
+    sudo systemctl restart apache2
+
+    # Allow necessary firewall rules
+    echo "Configuring firewall for web access..."
+    sudo ufw allow ssh
+    sudo ufw allow http
+    sudo ufw allow https
+
+    # Final success message
+    echo "Setup completed successfully! Visit http://jenkins.jersonix.online to access Jenkins."
   EOF
 }
