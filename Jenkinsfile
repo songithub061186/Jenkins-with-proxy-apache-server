@@ -2,80 +2,75 @@ pipeline {
     agent any
 
     parameters {
-        choice(
-            name: 'destroyInfrastructure',
-            choices: ['No', 'Yes'],
-            description: 'Do you want to destroy the Terraform infrastructure?'
-        )
-    }
-
-    environment {
-        AWS_REGION = 'us-east-1' // Specify your AWS region here
+        booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
+        booleanParam(name: 'APPLY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
+        booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
     }
 
     stages {
-        stage('Checkout Repository') {
+        stage('Clone Repository') {
             steps {
-                // Clone the GitHub repository
-                git branch: 'main', url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
+                // Clean workspace before cloning (optional)
+                // Clean the workspace if needed
+                cleanWs()
+
+                // Clone the Git repository
+                git branch: 'main',
+                    url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
+
+                sh "ls -lart"
             }
         }
 
-        stage('Initialize Terraform') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
-                    // Clean up previous state and initialize Terraform
-                    
-                    sh "terraform init"
-                }
-            }
-        }
-
-        stage('Plan Terraform') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
-                    // Run Terraform plan to preview changes
-                    sh "terraform plan -out=./tfplan"
-                }
-            }
-        }
-
-        stage('Apply Terraform') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
-                    // Apply Terraform changes
-                    sh "terraform apply -auto-approve ./tfplan"
-                }
-            }
-        }
-
-        stage('Destroy or Finish') {
+        stage('Terraform Init') {
             steps {
                 script {
-                    // Fallback if parameter is missing
-                    if (!params.destroyInfrastructure) {
-                        params.destroyInfrastructure = 'No'
-                    }
-
-                    if (params.destroyInfrastructure == 'Yes') {
-                        echo 'Destroying Terraform infrastructure...'
-                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
-                            sh "terraform destroy -auto-approve"
-                        }
-                    } else {
-                        echo 'No destruction needed. Finishing the pipeline.'
+                    // Using credentials securely
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
+                        sh 'echo "================= Terraform Init =================="'
+                        sh 'terraform init'
                     }
                 }
             }
         }
-    }
 
-    post {
-        success {
-            echo 'Terraform operation completed successfully!'
+        stage('Terraform Plan') {
+            steps {
+                script {
+                    if (params.PLAN_TERRAFORM) {
+                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
+                            sh 'echo "================= Terraform Plan =================="'
+                            sh 'terraform plan'
+                        }
+                    }
+                }
+            }
         }
-        failure {
-            echo 'Terraform execution failed. Check the logs for details.'
+
+        stage('Terraform Apply') {
+            steps {
+                script {
+                    if (params.APPLY_TERRAFORM) {
+                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
+                            sh 'echo "================= Terraform Apply =================="'
+                            sh 'terraform apply -auto-approve'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Destroy') {
+            steps {
+                script {
+                    if (params.DESTROY_TERRAFORM) {
+                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
+                            sh 'echo "================= Terraform Destroy =================="'
+                            sh 'terraform destroy -auto-approve'
+                        }
+                    }
+                }
+            }
         }
     }
 }
