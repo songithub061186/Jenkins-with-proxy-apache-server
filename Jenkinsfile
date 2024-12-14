@@ -9,6 +9,10 @@ pipeline {
         )
     }
 
+    environment {
+        AWS_REGION = 'us-east-1' // Specify your AWS region here
+    }
+
     stages {
         stage('Checkout Repository') {
             steps {
@@ -20,7 +24,8 @@ pipeline {
         stage('Initialize Terraform') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
-                    // Initialize Terraform in the working directory
+                    // Clean up previous state and initialize Terraform
+                    sh "rm -rf .terraform .terraform.lock.hcl tfplan"
                     sh "terraform init"
                 }
             }
@@ -30,7 +35,7 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
                     // Run Terraform plan to preview changes
-                    sh "terraform plan -out=tfplan"
+                    sh "terraform plan -out=./tfplan"
                 }
             }
         }
@@ -39,7 +44,7 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
                     // Apply Terraform changes
-                    sh "terraform apply -auto-approve tfplan"
+                    sh "terraform apply -auto-approve ./tfplan"
                 }
             }
         }
@@ -47,8 +52,12 @@ pipeline {
         stage('Destroy or Finish') {
             steps {
                 script {
+                    // Fallback if parameter is missing
+                    if (!params.destroyInfrastructure) {
+                        params.destroyInfrastructure = 'No'
+                    }
+
                     if (params.destroyInfrastructure == 'Yes') {
-                        // If the user selects 'Yes' to destroy, run terraform destroy
                         echo 'Destroying Terraform infrastructure...'
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
                             sh "terraform destroy -auto-approve"
