@@ -8,6 +8,15 @@ pipeline {
     }
 
     stages {
+        stage('Check Terraform Version') {
+            steps {
+                script {
+                    // Run terraform --version to check installed version
+                    bat 'terraform --version'
+                }
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
