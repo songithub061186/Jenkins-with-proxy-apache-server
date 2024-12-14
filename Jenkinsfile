@@ -11,7 +11,7 @@ pipeline {
         stage('Check Terraform Version') {
             steps {
                 script {
-                    // Run terraform --version to check installed version
+                    // Run terraform --version to check installed version using bat command on Windows
                     bat 'terraform --version'
                 }
             }
@@ -20,7 +20,7 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
-                sh 'ls -alh'  // List files to verify Terraform files are present
+                bat 'dir'  // List files to verify Terraform files are present on Windows
             }
         }
 
@@ -30,8 +30,8 @@ pipeline {
                     // Debugging step to check the environment
                     echo "Running Terraform Init"
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                        sh 'terraform version'  // Check Terraform version
-                        def initStatus = sh(script: 'terraform init', returnStatus: true)
+                        bat 'terraform version'  // Check Terraform version
+                        def initStatus = bat(script: 'terraform init', returnStatus: true)
                         if (initStatus != 0) {
                             error "Terraform Init failed with status ${initStatus}"
                         }
@@ -45,7 +45,7 @@ pipeline {
                 script {
                     if (params.PLAN_TERRAFORM) {
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                            sh 'terraform plan'
+                            bat 'terraform plan'
                         }
                     }
                 }
@@ -57,7 +57,7 @@ pipeline {
                 script {
                     if (params.APPLY_TERRAFORM) {
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                            sh 'terraform apply -auto-approve'
+                            bat 'terraform apply -auto-approve'
                         }
                     }
                 }
@@ -69,7 +69,7 @@ pipeline {
                 script {
                     if (params.DESTROY_TERRAFORM) {
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                            sh 'terraform destroy -auto-approve'
+                            bat 'terraform destroy -auto-approve'
                         }
                     }
                 }
