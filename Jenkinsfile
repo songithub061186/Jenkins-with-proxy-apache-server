@@ -10,25 +10,22 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                // Clean workspace before cloning (optional)
-                // Clean the workspace if needed
-                
-
-                // Clone the Git repository
-                git branch: 'main',
-                    url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
-
-                
+                git branch: 'main', url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
+                sh 'ls -alh'  // List files to verify Terraform files are present
             }
         }
 
         stage('Terraform Init') {
             steps {
                 script {
-                    // Using credentials securely
+                    // Debugging step to check the environment
+                    echo "Running Terraform Init"
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                        sh 'echo "================= Terraform Init =================="'
-                        sh 'terraform init'
+                        sh 'terraform version'  // Check Terraform version
+                        def initStatus = sh(script: 'terraform init', returnStatus: true)
+                        if (initStatus != 0) {
+                            error "Terraform Init failed with status ${initStatus}"
+                        }
                     }
                 }
             }
@@ -39,7 +36,6 @@ pipeline {
                 script {
                     if (params.PLAN_TERRAFORM) {
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                            sh 'echo "================= Terraform Plan =================="'
                             sh 'terraform plan'
                         }
                     }
@@ -52,7 +48,6 @@ pipeline {
                 script {
                     if (params.APPLY_TERRAFORM) {
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                            sh 'echo "================= Terraform Apply =================="'
                             sh 'terraform apply -auto-approve'
                         }
                     }
@@ -65,7 +60,6 @@ pipeline {
                 script {
                     if (params.DESTROY_TERRAFORM) {
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
-                            sh 'echo "================= Terraform Destroy =================="'
                             sh 'terraform destroy -auto-approve'
                         }
                     }
