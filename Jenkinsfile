@@ -12,13 +12,13 @@ pipeline {
             steps {
                 // Clean workspace before cloning (optional)
                 // Clean the workspace if needed
-                cleanWs()
+                
 
                 // Clone the Git repository
                 git branch: 'main',
                     url: 'https://github.com/songithub061186/Jenkins-with-proxy-apache-server.git'
 
-                sh "ls -lart"
+                
             }
         }
 
