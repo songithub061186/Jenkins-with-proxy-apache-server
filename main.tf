@@ -99,12 +99,10 @@ resource "aws_instance" "jenkins_apache_server" {
 
   # User Data script to install Jenkins, Apache, and configure firewall
   user_data = <<-EOF
+    user_data = <<-EOF
     #!/bin/bash
     echo "start"  # Log the start of the script
-
-    # Redirect output and errors to a log file for debugging
-    exec > /var/log/user-data.log 2>&1
-
+    
     # Update package lists
     echo "Updating package lists..."
     sudo apt update -y
@@ -115,7 +113,7 @@ resource "aws_instance" "jenkins_apache_server" {
 
     # Add Jenkins repository key
     echo "Adding Jenkins repository key..."
-    wget -q -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    sudo wget -q -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
 
     # Configure Jenkins repository
     echo "Configuring Jenkins repository..."
@@ -158,20 +156,19 @@ resource "aws_instance" "jenkins_apache_server" {
     sudo bash -c "cat > $JENKINS_CONF_PATH" <<JENKINS_CONF
 <VirtualHost *:80>
     ServerName jenkins.jersonix.online
-ServerAlias try.jersonix.online  # Added additional server name
-ProxyRequests Off
-ProxyPreserveHost On
-AllowEncodedSlashes NoDecode
+    ServerAlias try.jersonix.online
+    ProxyRequests Off
+    ProxyPreserveHost On
+    AllowEncodedSlashes NoDecode
 
-<Proxy http://localhost:8080/*>
-    Require all granted
-</Proxy>
+    <Proxy http://localhost:8080/*>
+        Require all granted
+    </Proxy>
 
-ProxyPass / http://localhost:8080/ nocanon
-ProxyPassReverse / http://localhost:8080/
-ProxyPassReverse / http://jenkins.jersonix.online/
-ProxyPassReverse / http://try.jersonix.online/
-
+    ProxyPass / http://localhost:8080/ nocanon
+    ProxyPassReverse / http://localhost:8080/
+    ProxyPassReverse / http://jenkins.jersonix.online/
+    ProxyPassReverse / http://try.jersonix.online/
 </VirtualHost>
 JENKINS_CONF
 
