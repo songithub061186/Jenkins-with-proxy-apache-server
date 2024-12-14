@@ -67,6 +67,29 @@ data "aws_route53_zone" "example" {
 }
 
 # Create Route 53 record for 'jenkins.jersonix.online'
+resource "aws_route53_record" "jenkins_record" {
+  zone_id = data.aws_route53_zone.example.id # Use the hosted zone ID for jersonix.online
+  name    = "jenkins.jersonix.online"
+  type    = "A"
+  ttl     = 300
+  records = [aws_instance.jenkins_apache_server.public_ip]
+}
+
+# Create CNAME record to forward 'try.jersonix.online' to 'jenkins.jersonix.online'
+resource "aws_route53_record" "cname_record" {
+  zone_id = data.aws_route53_zone.example.id # Use the hosted zone ID for jersonix.online
+  name    = "try.jersonix.online"
+  type    = "CNAME"
+  ttl     = 300
+  records = ["jenkins.jersonix.online"]
+}
+
+
+
+
+
+
+# Create Route 53 record for 'jenkins.jersonix.online'
 resource "aws_instance" "jenkins_apache_server" {
   ami                         = "ami-0e2c8caa4b6378d8c"
   instance_type               = "t2.micro"
@@ -113,17 +136,18 @@ resource "aws_instance" "jenkins_apache_server" {
   sudo bash -c 'cat > /etc/apache2/sites-available/jenkins.conf' <<JENKINS_CONF
   <VirtualHost *:80>
       ServerName jenkins.jersonix.online
-      ServerAlias try.jersonix.online
       ProxyRequests Off
       ProxyPreserveHost On
       AllowEncodedSlashes NoDecode
 
-      <Proxy http://localhost:8080/*>
-          Require all granted
-      </Proxy>
+       <Proxy http://localhost:8080/*>
+         Order deny,allow
+         Allow from all
+       </Proxy>
 
-      ProxyPass / http://localhost:8080/ nocanon
-      ProxyPassReverse / http://localhost:8080/
+       ProxyPass / http://localhost:8080/ nocanon
+       ProxyPassReverse / http://localhost:8080/
+       ProxyPassReverse / http://jenkins.jersonix.online/
   </VirtualHost>
   JENKINS_CONF
 
