@@ -1,7 +1,9 @@
 provider "aws" {
   region                   = "us-east-1"
-  shared_credentials_files = ["/Users/PC/.aws/credentials"]
+  shared_credentials_files = ["C:/Users/PC/.aws/credentials"]
+  profile                  = "default"  # Specify the profile you want to use
 }
+
 
 # Fetch default VPC
 data "aws_vpc" "default" {
@@ -39,7 +41,7 @@ resource "aws_security_group" "allow_all" {
 
 resource "aws_key_pair" "keypair" {
   key_name   = "my-keypair"  # Choose a name for the keypair
-  public_key = file("C:/Users/JERSON POGI/.ssh/my-keypair.pub")  # Path to your public key
+  public_key = file("C:/Users/PC/.ssh/my-keypair.pub")  # Path to your public key
 
 }
 

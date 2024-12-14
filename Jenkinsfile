@@ -25,7 +25,7 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-JERSON POGI']]) {
                     // Clean up previous state and initialize Terraform
-                    sh "rm -rf .terraform .terraform.lock.hcl tfplan"
+                    
                     sh "terraform init"
                 }
             }
