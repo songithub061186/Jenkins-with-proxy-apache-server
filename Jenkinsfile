@@ -2,9 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
-        booleanParam(name: 'APPLY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
-        booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
+        choice(name: 'TERRAFORM_ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Select the Terraform action to run')
     }
 
     stages {
@@ -40,37 +38,27 @@ pipeline {
             }
         }
 
-        stage('Terraform Plan') {
+        stage('Terraform Action') {
             steps {
                 script {
-                    if (params.PLAN_TERRAFORM) {
+                    // Check which action was selected and run the corresponding Terraform command
+                    if (params.TERRAFORM_ACTION == 'plan') {
+                        echo "Running Terraform Plan"
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
                             bat 'terraform plan'
                         }
-                    }
-                }
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                script {
-                    if (params.APPLY_TERRAFORM) {
+                    } else if (params.TERRAFORM_ACTION == 'apply') {
+                        echo "Running Terraform Apply"
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
                             bat 'terraform apply -auto-approve'
                         }
-                    }
-                }
-            }
-        }
-
-        stage('Terraform Destroy') {
-            steps {
-                script {
-                    if (params.DESTROY_TERRAFORM) {
+                    } else if (params.TERRAFORM_ACTION == 'destroy') {
+                        echo "Running Terraform Destroy"
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-JERSON-POGI']]) {
                             bat 'terraform destroy -auto-approve'
                         }
+                    } else {
+                        error "Invalid Terraform action selected"
                     }
                 }
             }
